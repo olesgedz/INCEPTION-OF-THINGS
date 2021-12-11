@@ -1,0 +1,46 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+login = "bconchit"
+
+server_name = "#{login}S"
+server_ip   = "192.168.42.110"
+worker_name = "#{login}SW"
+worker_ip   = "192.168.42.111"
+
+Vagrant.configure("2") do |config|
+
+  config.vm.box     = "generic/centos8"
+  config.vm.box_url = "https://app.vagrantup.com/generic/boxes/centos8/versions/3.6.0/providers/virtualbox.box"
+
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider :virtualbox do |v, override|
+    v.customize ["modifyvm", :id, "--memory", 1024]
+    v.customize ["modifyvm", :id, "--cpus", 1]
+    v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+  end
+
+  # Server
+  config.vm.define server_name do |control|
+    control.vm.hostname = server_name
+    control.vm.network "private_network", ip: server_ip
+    control.vm.provider "virtualbox" do |v|
+      v.customize ["modifyvm", :id, "--name", server_name]
+    end
+    control.vm.provision "shell", privileged: false, path: "scripts/server.sh", env: {"NODE_IP": server_ip}
+  end
+
+  # ServerWorker
+  config.vm.define worker_name do |control|
+    control.vm.hostname = worker_name
+    control.vm.network "private_network", ip: worker_ip
+    control.vm.provider "virtualbox" do |v|
+      v.customize ["modifyvm", :id, "--name", worker_name]
+    end
+    control.vm.provision "file", source: ".vagrant/machines/#{server_name}/virtualbox/private_key", destination: "~/private_key"
+    control.vm.provision "shell", privileged: false, path: "scripts/agent.sh", env: {"SERVER_IP": server_ip, "NODE_IP": worker_ip}
+  end
+
+end
